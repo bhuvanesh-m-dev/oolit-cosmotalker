@@ -15,7 +15,7 @@ def load_model():
     global model, tokenizer
     if model is None:
         try:
-            print(f"Loading {MODEL_NAME} ...")
+            print(f"Loading {MODEL_NAME} ... This may take a while.")
             
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
@@ -38,28 +38,21 @@ def oolit_query():
     query = request.args.get('q')
     
     if not query:
-        return jsonify({
-            "status": "error",
-            "message": "Query parameter 'q' is required"
-        }), 400
+        return jsonify({"status": "error", "message": "Query parameter 'q' is required"}), 400
 
-    # Load model (only once)
     load_model()
     
     if model is None or tokenizer is None:
-        return jsonify({
-            "status": "error",
-            "message": "AI model is currently unavailable"
-        }), 503
+        return jsonify({"status": "error", "message": "AI model is not loaded yet"}), 503
 
     try:
-        prompt = f"You are Oolit, a friendly and knowledgeable astronomy and space assistant.\n\nUser: {query}\n\nOolit:"
+        prompt = f"You are Oolit, a friendly astronomy and space assistant.\n\nUser: {query}\n\nOolit:"
         
         inputs = tokenizer(prompt, return_tensors="pt").to("cpu")
         
         outputs = model.generate(
             **inputs,
-            max_new_tokens=250,
+            max_new_tokens=200,
             temperature=0.7,
             do_sample=True,
             pad_token_id=tokenizer.eos_token_id,
@@ -67,37 +60,26 @@ def oolit_query():
         )
         
         response_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        # Clean response - take only the part after "Oolit:"
         response_text = response_text.split("Oolit:")[-1].strip()
         
         return jsonify({
             "status": "success",
             "query": query,
             "response": response_text,
-            "model": MODEL_NAME,
-            "version": "1.0"
+            "model": MODEL_NAME
         })
         
     except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": "Failed to generate response"
-        }), 500
+        return jsonify({"status": "error", "message": "Failed to generate response"}), 500
 
-# Optional: Keep original endpoint for backward compatibility
+
 @app.route('/api/get', methods=['GET'])
 def get_space_info():
     query = request.args.get('q')
     if not query:
         return jsonify({"status": "error", "message": "Query required"}), 400
-    
     data = get_info(query)
-    return jsonify({
-        "status": "success",
-        "query": query,
-        "data": data,
-        "source": "cosmotalker"
-    })
+    return jsonify({"status": "success", "query": query, "data": data})
 
 if __name__ == "__main__":
     load_model()
